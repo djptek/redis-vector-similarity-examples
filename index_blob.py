@@ -24,7 +24,7 @@ with open('data.csv', 'r') as infile:
 
 dimensions = len(vectors[0])
 print("DIM {}".format(dimensions))
-index_name = 'idx:vectors' 
+index_name = 'idx:blob:vectors' 
 key_prefix = 'vector:'
 del_keys_lua = """local i = 0 for _,v in ipairs(redis.call('KEYS', ARGV[1])) do i 
 = i + redis.call('DEL', v) end return i"""
