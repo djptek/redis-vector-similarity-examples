@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import re
 import redis
 import sys
 import numpy as np
@@ -97,19 +98,23 @@ for i, vector in enumerate(vectors):
 ## FT.SEARCH idx:json:cli '*=>[KNN 5 @vec $blob AS score]' SORTBY score PARAMS 2 blob \x27\x02\x1b DIALECT 2
 ## > FT.SEARCH idx:json:vectors '*=>[KNN 5 @vec $blob AS score]' SORTBY score PARAMS 2 blob \x000027\x000002\x00001b DIALECT 2
 
+#count = len(vectors)+1
+count = 3
 query = (
-    Query("*=>[KNN {} @{} $blob AS score]".format(len(vectors)+1, vector_field))
-     .sort_by("score")
-     .return_fields("id", "score")
+    Query("*=>[KNN {} @{} $blob AS score]".format(count, vector_field))
+     .sort_by(field = "score", asc = False)
+     .return_fields("id", "score", "$.vec")
      .dialect(2)
 )
 
 for i, vector in enumerate(vectors):
+    blob = re.sub(r'\'','',re.sub(r'^b','',str(
+        np.array(
+            vector[vector_field], 
+            dtype=np.int16).tobytes())))
     query_params = {
-        "blob": np.array(
-                list(vector[vector_field]), dtype=np.int64).tobytes()
+        "blob": blob
     }    
-    print('Matching {}{} => {}'.format(key_prefix, i, np.array(
-                list(vector[vector_field]), dtype=np.int64).tobytes()))
+    print('Matching {}{} => {}'.format(key_prefix, i, blob))
     print(r.ft(index_name).search(query, query_params).docs)
 

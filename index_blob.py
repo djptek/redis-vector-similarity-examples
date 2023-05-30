@@ -38,7 +38,7 @@ schema = (
         attributes = {
             'TYPE': 'FLOAT32', 
             'DIM': dimensions, 
-            'DISTANCE_METRIC': 'COSINE'})
+            'DISTANCE_METRIC': 'L2'})
 )
 
 r = redis.Redis(
