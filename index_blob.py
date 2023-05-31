@@ -80,16 +80,18 @@ print(p.execute())
 
 query = (
     Query("*=>[KNN {} @{} $blob as score]".format(len(vectors)+1, vector_field))
-     .sort_by("score")
-     .return_fields("id", "score")
-     .dialect(2)
+        .sort_by(field = "score", asc = True)
+        .return_fields("id", "score")
+        .dialect(2)
 )
 
 for i, vector in enumerate(vectors):
+    print(vector)
+    blob = vector.tobytes()
     query_params = {
-        "blob": vector.tobytes()
+        "blob": blob
     }
-    print('Matching {}{}'.format(key_prefix, i))
+    print('Matching {}{} blob {}'.format(key_prefix, i, blob))
     print(r.ft(index_name).search(query, query_params).docs)
 
 # FT.SEARCH my_idx "*=>[KNN 10 @vec $BLOB]" PARAMS 2 BLOB "\x00\x000C\x00\x00\xe0@\x00\x00\xe0A" DIALECT 2
