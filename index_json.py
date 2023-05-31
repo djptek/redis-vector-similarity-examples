@@ -15,16 +15,48 @@ rs_host = os.getenv('RS_HOST')
 rs_port = os.getenv('RS_PORT')
 rs_pass = os.getenv('RS_AUTH')
 
-# int_to_hex will take negatives
-def int_to_hex(i, bytes, digits):
-    f_string="\\x{{:0{}X}}".format(digits)
-    return (f_string.format(-1 & ((1 << bytes)-1))) 
-
 del_keys_lua = """local i = 0 for _,v in ipairs(redis.call('KEYS', ARGV[1])) do i 
 = i + redis.call('DEL', v) end return i"""
 
 vectors = []
 vector_field = 'vec'
+
+def array_of_int_to_blob(a, bytes):
+    # a is array e.g. [1, 2, 3]
+    # bytes is target number of bytes
+    prefix = '\\x'
+    match (bytes+len(prefix)):
+        case 3:
+            dt = np.int8
+        case 4:
+            dt = np.int16
+        case 6:
+            dt = np.int32
+        case 10:
+            dt = np.int64
+        case 18:
+            dt = np.int128
+        case 34:
+            dt = np.int256
+        case _:
+            sys.exit(
+                'numpy can\'t fit integers of size {} bytes into blob'.format(
+                    bytes))
+    return re.sub(r'\'','',re.sub(r'^b','',str(
+        np.array(
+            a, 
+            dtype=dt).tobytes())))
+
+def vector_type(bytes):
+    match bytes:
+        case 2:
+            return 'FLOAT64'
+        case 1:
+            return 'FLOAT32'
+        case _:
+            sys.exit(
+                'can\'t fit integers of size {} bytes into redis blob'.format(
+                    bytes))
 
 with open('data.csv', 'r') as infile:
     reader = csv.reader(infile)
@@ -35,6 +67,7 @@ print(vectors)
 dimensions = len(vectors[0][vector_field])
 print("DIM {}".format(dimensions))
 
+bytes = 2
 index_name = 'idx:json:vectors' 
 json_prefix = '$.'
 key_prefix = 'vector:'
@@ -48,9 +81,9 @@ schema = (
             vector_field),
         algorithm = 'FLAT', 
         attributes = {
-            'TYPE': 'FLOAT64',
+            'TYPE': vector_type(bytes),
             'DIM': dimensions, 
-            'DISTANCE_METRIC': 'COSINE'},
+            'DISTANCE_METRIC': 'L2'},
         as_name = vector_field)
 )
 
@@ -108,13 +141,10 @@ query = (
 )
 
 for i, vector in enumerate(vectors):
-    blob = re.sub(r'\'','',re.sub(r'^b','',str(
-        np.array(
-            vector[vector_field], 
-            dtype=np.int16).tobytes())))
+    blob = array_of_int_to_blob(vector[vector_field], bytes)
     query_params = {
         "blob": blob
     }    
-    print('Matching {}{} => {}'.format(key_prefix, i, blob))
+    print('Matching {}{} {} blob: {}'.format(key_prefix, i, vector, blob))
     print(r.ft(index_name).search(query, query_params).docs)
 
