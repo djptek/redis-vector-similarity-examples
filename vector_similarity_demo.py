@@ -76,7 +76,7 @@ def index_vectors(redis_instance, vectors, idx_type, vector_field, key_prefix):
 
 
 def search_vectors(redis_instance, idx, vectors, vector_field, mx_hits):
-    """Traverse array of vectors and search Redis for these by vector similatory vs index idx"""
+    """Traverse array of vectors and search Redis for these by vector similarity vs index idx"""
     vs_query = (
         f"*=>[KNN {min(len(vectors) + 1, mx_hits)} @{vector_field} $blob AS score]"
     )
