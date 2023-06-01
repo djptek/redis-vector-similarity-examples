@@ -8,9 +8,12 @@ Redis Vector Similarity examples prepared to compare and contrast usage of JSON 
 `./vector_similarity_demo.py [-h] [-j] in_file`
 
 Warning: can and will delete keys and indexes, **** USE AT OWN RISK ****.
-Reads Vectors from a csv and indexes to Redis for query by similarity. Define
-Redis connection by env variables: [RS_HOST, RS_PORT, RS_AUTH]. Install pre-
-reqs with: /usr/bin/pip3 install numpy
+
+Reads Vectors from a csv and indexes to Redis for query by similarity. 
+
+Define Redis connection by env variables: [`RS_HOST`, `RS_PORT`, `RS_AUTH`]. 
+
+Install pre-reqs with: `/usr/bin/pip3 install numpy`
 
 positional arguments:
   in_file     csv file containing input data
