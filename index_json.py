@@ -1,5 +1,5 @@
+"""Demo code for Redis Vector Similarity with JSON"""
 import csv
-import json
 import os
 import redis
 import numpy as np
@@ -8,116 +8,120 @@ from redis.commands.search.query import Query
 from redis.commands.search.field import VectorField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 
-rs_host = os.getenv('RS_HOST')
-rs_port = os.getenv('RS_PORT')
-rs_pass = os.getenv('RS_AUTH')
+rs_host = os.getenv("RS_HOST")
+rs_port = os.getenv("RS_PORT")
+rs_pass = os.getenv("RS_AUTH")
 
-def read_vectors(file, field):
+
+def read_vectors(in_file, vector_field):
+    """Read csv lines from file into an array of JSON objects containing vectors"""
     vectors = []
-    with open('data.csv', 'r') as infile:
+    with open(file=in_file, mode="r", encoding="UTF-8") as infile:
         reader = csv.reader(infile)
         for row in reader:
-            vectors.append(
-                 {vector_field:np.array(
-                    list(row), 
-                    dtype=np.float32)})
+            vectors.append({vector_field: np.array(list(row), dtype=np.float32)})
     return vectors, len(vectors[0][vector_field])
 
-def del_keys_by_prefix(r, prefix):
-    print('Deleted {} keys with prefix "{}"'.format(
-        r.eval(
-            """local i = 0 for _,v in ipairs(redis.call('KEYS', ARGV[1])) do i 
+
+def del_keys_by_prefix(redis_instance, prefix):
+    """EVAL Lua to delete a set of keys by prefix * USE AT OWN RISK *"""
+    print(
+        'Deleted {} keys with prefix "{}"'.format(
+            redis_instance.eval(
+                """local i = 0 for _,v in ipairs(redis.call('KEYS', ARGV[1])) do i 
 = i + redis.call('DEL', v) end return i""",
-            0,
-         "{}*".format(key_prefix)),
-        key_prefix))
+                0,
+                f"{prefix}*",
+            ),
+            prefix,
+        )
+    )
 
-def drop_index(name):
+
+def drop_index(redis_instance, name):
+    """Drop index by name advise if it wasn't there"""
     try:
-        r.ft(index_name).dropindex()
+        redis_instance.ft(name).dropindex()
     except redis.exceptions.ResponseError:
-        print('First run vs this Endpoint')
+        print("First run vs this Endpoint")
 
-def create_index(name, vf, d, r):
-    print(r.ft(name).create_index(
-        fields = (
-            VectorField(
-                name = '$.{}'.format(vf),
-                algorithm = 'FLAT', 
-                attributes = {
-                    'TYPE': 'FLOAT32',
-                    'DIM': d, 
-                    'DISTANCE_METRIC': 'L2'},
-                as_name = vector_field)),
-        definition = 
-            IndexDefinition(
-                index_type=IndexType.JSON, 
-                prefix=[key_prefix])))
-    
-def index_vectors(vs, vf, kp):
-    for i, vector in enumerate(vs):
-        j = {vf:vector[vector_field].tolist()}
-        print(
-            '> JSON.SET {}{} $ {}'.format(
-                kp, 
-                i, 
-                j))
-        print(r.json().set(
-            '{}{}'.format(
-                kp, 
-                i), 
-            '$',
-            j))
-        
-def search_vectors(idx, vs, vf, m):
-    vs_query = "*=>[KNN {} @{} $blob AS score]".format(
-        min(len(vs)+1, m), 
-        vector_field)
-    q = (
-        Query(vs_query)
-        .sort_by(field = "score", asc = True)
-        .return_fields("id", "score", "$.vec")
-        .dialect(2))
-    dbg_query = "> FT.SEARCH {} \'{}\' {} {{}} DIALECT 2".format(
-        index_name, 
-        vs_query,
-        "SORTBY score PARAMS 2 blob")
+
+def create_index(redis_instance, name, vector_field, dim):
+    """Create an index suitable to index Vectors of length read from csv"""
+    print(
+        redis_instance.ft(name).create_index(
+            fields=(
+                VectorField(
+                    name=f"$.{vector_field}",
+                    algorithm="FLAT",
+                    attributes={"TYPE": "FLOAT32", "DIM": dim, "DISTANCE_METRIC": "L2"},
+                    as_name=vector_field,
+                )
+            ),
+            definition=IndexDefinition(index_type=IndexType.JSON, prefix=[KEY_PREFIX]),
+        )
+    )
+
+
+def index_vectors(redis_instance, vectors, vector_field, key_prefix):
+    """Traverse array of vectors and set these as JSON in Redis"""
+    for i, vector in enumerate(vectors):
+        j = {vector_field: vector[vector_field].tolist()}
+        print(f"> JSON.SET {key_prefix}{i} $ {j}")
+        print(redis_instance.json().set(f"{key_prefix}{i}", "$", j))
+
+
+def search_vectors(redis_instance, idx, vectors, vector_field, max_hits):
+    """Traverse array of vectors and search Redis for these by vector similatory vs index idx"""
+    vs_query = (
+        f"*=>[KNN {min(len(vectors) + 1, max_hits)} @{vector_field} $blob AS score]"
+    )
+    dbg_query = f"> FT.SEARCH {INDEX_NAME} '{vs_query}' SORTBY score PARAMS 2 blob {{}} DIALECT 2"
     for vector in vectors:
-        print("Searching {}".format(repr(vector)))
-        blob = vector[vf].tobytes()
+        print(f"Searching {repr(vector)}")
+        blob = vector[vector_field].tobytes()
         print(dbg_query.format(repr(blob)[2:-1]))
-        print(r.ft(idx).search(
-            query = q, 
-            query_params = {"blob": blob}).docs)
+        print(
+            redis_instance.ft(idx)
+            .search(
+                query=Query(vs_query)
+                .sort_by(field="score", asc=True)
+                .return_fields("id", "score", "$.vec")
+                .dialect(2),
+                query_params={"blob": blob},
+            )
+            .docs
+        )
 
-vector_field = 'vec'
-index_name = 'idx:json:vectors' 
-key_prefix = 'vector:'
-max_results = 10
 
-vectors, dimensions = read_vectors(
-    file = 'data.csv',
-    field = vector_field)
+VECTOR_FIELD = "vec"
+INDEX_NAME = "idx:json:vectors"
+KEY_PREFIX = "vector:"
+MAX_RESULTS = 10
 
-r = redis.Redis(
-    host = rs_host,
-    port = rs_port,
-    password = rs_pass
+my_vectors, schema_dimension = read_vectors(
+    in_file="data.csv", vector_field=VECTOR_FIELD
 )
+my_redis = redis.Redis(host=rs_host, port=rs_port, password=rs_pass)
 
-del_keys_by_prefix(r, key_prefix)
-drop_index(name = index_name)
+del_keys_by_prefix(redis_instance=my_redis, prefix=KEY_PREFIX)
+drop_index(redis_instance=my_redis, name=INDEX_NAME)
 create_index(
-    name = index_name,
-    vf = vector_field,
-    d = dimensions,
-    r = r)
+    redis_instance=my_redis,
+    name=INDEX_NAME,
+    vector_field=VECTOR_FIELD,
+    dim=schema_dimension,
+)
 index_vectors(
-    vs = vectors, 
-    vf = vector_field, 
-    kp = key_prefix)
+    redis_instance=my_redis,
+    vectors=my_vectors,
+    vector_field=VECTOR_FIELD,
+    key_prefix=KEY_PREFIX,
+)
 search_vectors(
-    idx = index_name,
-    vs = vectors,
-    vf = vector_field,
-    m = max_results)
+    redis_instance=my_redis,
+    idx=INDEX_NAME,
+    vectors=my_vectors,
+    vector_field=VECTOR_FIELD,
+    max_hits=MAX_RESULTS,
+)
