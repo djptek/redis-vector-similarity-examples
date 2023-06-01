@@ -1,13 +1,15 @@
 
 ## Redis Vector Similarity examples
 
-Redis Vector Similarity examples prepared to compare and contrast usage of JSON and HASH index types under python3.
+Redis Vector Similarity examples prepared to compare and contrast usage of `JSON` and `HASH` index types under `python3`.
 
 ## usage
 
 `./vector_similarity_demo.py [-h] [-n MAX_HITS] [-j] in_file`
 
-Warning: can and will delete keys and indexes, **** USE AT OWN RISK ****.
+ **** USE AT OWN RISK ****
+
+Warning: can and will delete keys and indexes.
 
 Reads Vectors from a `csv` and indexes to Redis for query by similarity. 
 
