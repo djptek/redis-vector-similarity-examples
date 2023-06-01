@@ -1,10 +1,14 @@
 """Demo code for Redis Vector Similarity with JSON
-Warning: this code can delete keys and indexes, use at your own risk
+Warning: this code can delete keys and indexes, * USE AT OWN RISK *
 
 Please define your redis connection by defining the appropriate env variables
 RS_HOST
 RS_PORT
 RS_AUTH
+
+Pre-req: install numpy
+
+$ pip3 install numpy
 """
 
 import csv
@@ -23,7 +27,8 @@ def read_vectors(in_file):
     with open(file=in_file, mode="r", encoding="UTF-8") as infile:
         reader = csv.reader(infile)
         for row in reader:
-            vectors.append(np.array(list(row), dtype=np.float32))
+            # vectors.append(np.array(list(row), dtype=np.float64))
+            vectors.append(np.array(list(row), dtype=np.float64))
     return vectors, len(vectors[0])
 
 
@@ -52,18 +57,16 @@ def drop_index(redis_instance, name):
 
 def create_index(redis_instance, name, idx_type, vector_field, dim):
     """Create an index suitable to index Vectors of length read from csv"""
-    print(
-        redis_instance.ft(name).create_index(
-            fields=(
-                VectorField(
-                    name=f"$.{vector_field}",
-                    algorithm="FLAT",
-                    attributes={"TYPE": "FLOAT32", "DIM": dim, "DISTANCE_METRIC": "L2"},
-                    as_name=vector_field,
-                )
-            ),
-            definition=IndexDefinition(index_type=idx_type, prefix=[KEY_PREFIX]),
-        )
+    return redis_instance.ft(name).create_index(
+        fields=(
+            VectorField(
+                name=f"$.{vector_field}",
+                algorithm="FLAT",
+                attributes={"TYPE": "FLOAT64", "DIM": dim, "DISTANCE_METRIC": "L2"},
+                as_name=vector_field,
+            )
+        ),
+        definition=IndexDefinition(index_type=idx_type, prefix=[KEY_PREFIX]),
     )
 
 
@@ -80,11 +83,9 @@ def search_vectors(redis_instance, idx, vectors, vector_field, max_hits):
     vs_query = (
         f"*=>[KNN {min(len(vectors) + 1, max_hits)} @{vector_field} $blob AS score]"
     )
-    dbg_query = f"> FT.SEARCH {INDEX_NAME} '{vs_query}' SORTBY score PARAMS 2 blob {{}} DIALECT 2"
     for vector in vectors:
-        print(f"Searching {repr(vector)}")
+        print(f"\nSearching {idx} by Vector Similarity to {vector}")
         blob = vector.tobytes()
-        print(dbg_query.format(repr(blob)[2:-1]))
         print(
             redis_instance.ft(idx)
             .search(
@@ -103,7 +104,7 @@ INDEX_TYPE = IndexType.JSON
 VECTOR_FIELD = "vector"
 INDEX_NAME = f"idx:{INDEX_TYPE.name.lower()}:vectors"
 KEY_PREFIX = f"{VECTOR_FIELD}:"
-MAX_RESULTS = 10
+MAX_RESULTS = 5
 
 my_vectors, schema_dimension = read_vectors(in_file="data.csv")
 
