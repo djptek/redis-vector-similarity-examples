@@ -1,4 +1,4 @@
-# Redis Vector Similarity Examples
+## Redis Vector Similarity Examples
 
 Redis Vector Similarity examples prepared to compare and contrast usage of JSON and HASH index types under python3.
 
@@ -20,7 +20,7 @@ optional arguments:
 
 ## Examples
 
-### Create Index, add 6 HASH type keys each containing a 3D vector & retrieve 1st match for these vectors, matches original key.
+Create Index, add 6 HASH type keys each containing a 3D vector & retrieve 1st match for these vectors, matches original key.
 
 ```
 % ./vector_similarity_demo.py datasets/dates.csv -n 1
@@ -51,7 +51,7 @@ Searching idx:hash:vectors by Vector Similarity to [1. 2. 3.]
 [Document {'id': 'vector:5', 'payload': None, 'score': '0', 'vector': '\x00\x00\x00\x00\x00\x00?\x00\x00\x00\x00\x00\x00\x00@\x00\x00\x00\x00\x00\x00\x08@'}]
 ```
 
-### Create Index, add 6 JSON type keys each containing a 3D vector & retrieve top 2 matches for these vectors.
+Create Index, add 6 JSON type keys each containing a 3D vector & retrieve top 2 matches for these vectors.
 
 ```
 % ./vector_similarity_demo.py datasets/dates.csv -j -n 2
