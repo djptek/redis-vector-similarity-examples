@@ -1,7 +1,6 @@
+# Redis Vector Similarity Examples
 
-# redis-vector-similarity-examples
-
-# redis-vector-similarity-examples
+Redis Vector Similarity examples prepared to compare and contrast usage of JSON and HASH index types under python3.
 
 ## usage
 
