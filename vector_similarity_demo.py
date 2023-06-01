@@ -22,7 +22,6 @@ def read_vectors(in_f):
     with open(file=in_f, mode="r", encoding="UTF-8") as infile:
         reader = csv.reader(infile)
         for row in reader:
-            # vectors.append(np.array(list(row), dtype=np.float64))
             vectors.append(np.array(list(row), dtype=np.float64))
     return vectors, len(vectors[0])
 
@@ -76,10 +75,10 @@ def index_vectors(redis_instance, vectors, idx_type, vector_field, key_prefix):
     pipe.execute()
 
 
-def search_vectors(redis_instance, idx, vectors, vector_field, max_hits):
+def search_vectors(redis_instance, idx, vectors, vector_field, mx_hits):
     """Traverse array of vectors and search Redis for these by vector similatory vs index idx"""
     vs_query = (
-        f"*=>[KNN {min(len(vectors) + 1, max_hits)} @{vector_field} $blob AS score]"
+        f"*=>[KNN {min(len(vectors) + 1, mx_hits)} @{vector_field} $blob AS score]"
     )
     for vector in vectors:
         print(f"\nSearching {idx} by Vector Similarity to {vector}")
@@ -89,7 +88,7 @@ def search_vectors(redis_instance, idx, vectors, vector_field, max_hits):
             .search(
                 query=Query(vs_query)
                 .sort_by(field="score", asc=True)
-                .return_fields("id", "score", f"$.{vector_field}")
+                .return_fields("id", "score", vector_field)
                 .dialect(2),
                 query_params={"blob": blob},
             )
@@ -175,5 +174,5 @@ search_vectors(
     idx=INDEX_NAME,
     vectors=my_vectors,
     vector_field=VECTOR_FIELD,
-    max_hits=max_hits,
+    mx_hits=max_hits,
 )
