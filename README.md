@@ -1,6 +1,7 @@
+
 # redis-vector-similarity-examples
 
-# usage
+## usage
 
 vector_similarity_demo.py [-h] [-j] in_file
 
@@ -16,9 +17,9 @@ optional arguments:
   -h, --help  show this help message and exit
   -j          use index type JSON instead of default HASH
 
-# Examples
+## Examples
 
-Create Index, add 6 HASH type keys each containing a 3D vector & retrieve 1st match for these vectors, matches original key.
+### Create Index, add 6 HASH type keys each containing a 3D vector & retrieve 1st match for these vectors, matches original key.
 
 ```
 % ./vector_similarity_demo.py datasets/dates.csv -n 1
@@ -49,7 +50,7 @@ Searching idx:hash:vectors by Vector Similarity to [1. 2. 3.]
 [Document {'id': 'vector:5', 'payload': None, 'score': '0', 'vector': '\x00\x00\x00\x00\x00\x00?\x00\x00\x00\x00\x00\x00\x00@\x00\x00\x00\x00\x00\x00\x08@'}]
 ```
 
-Create Index, add 6 JSON type keys each containing a 3D vector & retrieve top 2 matches for these vectors.
+### Create Index, add 6 JSON type keys each containing a 3D vector & retrieve top 2 matches for these vectors.
 
 ```
 % ./vector_similarity_demo.py datasets/dates.csv -j -n 2
@@ -86,6 +87,7 @@ Searching idx:json:vectors by Vector Similarity to [1. 2. 3.]
 [Document {'id': 'vector:5', 'payload': None, 'score': '0', 'vector': '[1.0,2.0,3.0]'}, Document {'id': 'vector:1', 'payload': None, 'score': '81', 'vector': '[0.0,-2.0,-5.0]'}]
 ```
 
-Note: input CSV contains integers, however, using Float solves
+## Notes
+Input CSV contains integers, however, using Float solves
 - potential ambiguity around 2s complement for negatives
 - issues with Python bytes in printable range
