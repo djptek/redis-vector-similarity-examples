@@ -1,9 +1,11 @@
 
 # redis-vector-similarity-examples
 
+# redis-vector-similarity-examples
+
 ## usage
 
-vector_similarity_demo.py [-h] [-j] in_file
+`./vector_similarity_demo.py [-h] [-j] in_file`
 
 Warning: can and will delete keys and indexes, **** USE AT OWN RISK ****.
 Reads Vectors from a csv and indexes to Redis for query by similarity. Define
