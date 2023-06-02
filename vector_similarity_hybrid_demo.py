@@ -16,14 +16,23 @@ from redis.commands.search.field import VectorField
 from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 
 
-def read_vectors():
-    """Read csv lines from file into an array of JSON objects containing vectors"""
-    vectors = []
+def read_rows():
+    """Read csv lines from file into an array of JSON objects containing rows"""
+    rows = []
     with open(file=IN_FILE, mode="r", encoding="UTF-8") as in_file:
         reader = csv.reader(in_file)
+        headers = next(reader)
         for row in reader:
-            vectors.append(np.array(list(row), dtype=np.float64))
-    return vectors, len(vectors[0])
+            rows.append(
+                {
+                    headers[1]: row[1],
+                    headers[4]: row[4],
+                    VECTOR_FIELD: np.array(
+                        list([row[0], row[2], row[3]]), dtype=np.float64
+                    ),
+                }
+            )
+    return rows, len(rows[0]), headers
 
 
 def del_keys_by_prefix(redis_instance):
@@ -49,42 +58,28 @@ def drop_index(redis_instance):
         print("First run vs this Endpoint")
 
 
-def json_set(pipeline, vector, key):
-    """JSON.SET a vector to Redis"""
-    j = {VECTOR_FIELD: vector.tolist()}
-    print(f"> JSON.SET {key} $ {j}")
-    pipeline.json().set(key, "$", j)
-
-
-def blob_hset(pipeline, vector, key):
-    """HSET a vector to Redis"""
-    vector_bytes = vector.tobytes()
-    print(f"HSET {key} {VECTOR_FIELD} {repr(vector_bytes)[2:-1]}")
-    pipeline.hset(name=key, mapping={VECTOR_FIELD: vector_bytes})
-
-
-def add_vectors(redis_instance, vectors):
-    """Traverse array of vectors and set these as JSON in Redis"""
-    pipe = redis_instance.pipeline()
-    for i, vector in enumerate(vectors):
+def add_rows(redis_instance, rows):
+    """Traverse array of rows and set these as JSON in Redis"""
+    pipeline = redis_instance.pipeline()
+    for i, row in enumerate(rows):
         key = f"{KEY_PREFIX}{i}"
         if INDEX_TYPE == IndexType.JSON:
-            json_set(pipeline=pipe, vector=vector, key=key)
+            pipeline.json().set(key, "$", {VECTOR_FIELD: row[VECTOR_FIELD].tolist()})
         else:
-            blob_hset(pipeline=pipe, vector=vector, key=key)
+            pipeline.hset(name=key, mapping={VECTOR_FIELD: row[VECTOR_FIELD].tobytes()})
         if i % MAX_PIPELINE == 0:
-            pipe.execute()
-    pipe.execute()
+            print(f"{'HSET' if INDEX_TYPE == IndexType.HASH else 'JSON.SET'} {key} ...")
+            pipeline.execute()
+    pipeline.execute()
 
 
-def search_vectors(redis_instance, vectors):
-    """Traverse array of vectors and search Redis for these by vector similarity vs index idx"""
-    vs_query = (
-        f"*=>[KNN {min(len(vectors) + 1, MAX_HITS)} @{VECTOR_FIELD} $blob AS score]"
-    )
-    for vector in vectors:
-        print(f"\nSearching {INDEX_NAME} by Vector Similarity to {vector}")
-        blob = vector.tobytes()
+def search_rows(redis_instance, rows):
+    """Traverse array of rows and search Redis for these by vector similarity vs index idx"""
+    vs_query = f"*=>[KNN {min(len(rows) + 1, MAX_HITS)} @{VECTOR_FIELD} $blob AS score]"
+    step = max(1, len(rows) // MAX_QUERIES)
+    for i in range(0, step * MAX_QUERIES, step):
+        print(f"\nSearching {INDEX_NAME} by Vector Similarity to row {i} {rows[i]}")
+        blob = rows[i][VECTOR_FIELD].tobytes()
         print(
             redis_instance.ft(INDEX_NAME)
             .search(
@@ -112,7 +107,14 @@ def get_args():
         "-n",
         dest="max_hits",
         type=int,
-        help="maximum number of similar vectors to return",
+        help="maximum number of similar rows to return",
+        default=10,
+    )
+    parser.add_argument(
+        "-q",
+        dest="max_queries",
+        type=int,
+        help="maximum number of queries to run",
         default=10,
     )
     parser.add_argument(
@@ -123,14 +125,12 @@ def get_args():
         default=IndexType.HASH,
         help="use index type JSON instead of default HASH",
     )
-
     args = parser.parse_args()
-
-    return args.index_type, args.in_file, args.max_hits
+    return args.index_type, args.in_file, args.max_hits, args.max_queries
 
 
 ###
-INDEX_TYPE, IN_FILE, MAX_HITS = get_args()
+INDEX_TYPE, IN_FILE, MAX_HITS, MAX_QUERIES = get_args()
 VECTOR_FIELD = "vector"
 INDEX_NAME = f"idx:{INDEX_TYPE.name.lower()}:vectors"
 KEY_PREFIX = f"{VECTOR_FIELD}:"
@@ -138,7 +138,7 @@ MAX_PIPELINE = 10000
 
 
 # collect input csv and calculate vector DIM
-my_vectors, dim = read_vectors()
+csv_rows, dim, csv_headers = read_rows()
 
 # connect to Redis
 my_redis = redis.Redis(
@@ -162,14 +162,11 @@ my_redis.ft(INDEX_NAME).create_index(
     definition=IndexDefinition(index_type=INDEX_TYPE, prefix=[KEY_PREFIX]),
 )
 
-# index the data as vectors
-add_vectors(
+# index the data as rows
+add_rows(
     redis_instance=my_redis,
-    vectors=my_vectors,
+    rows=csv_rows,
 )
 
 # run vector similarity searches over the data
-search_vectors(
-    redis_instance=my_redis,
-    vectors=my_vectors,
-)
+search_rows(redis_instance=my_redis, rows=csv_rows)

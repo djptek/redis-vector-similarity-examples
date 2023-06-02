@@ -1,3 +1,6 @@
+hybrid_datasets/2013*
+hybrid_datasets/100k*
+hybrid_datasets/*.zip
 .vscode/*
 
 # Byte-compiled / optimized / DLL files
