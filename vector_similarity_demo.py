@@ -91,7 +91,7 @@ def search_vectors(redis_instance, vectors):
                 query=Query(vs_query)
                 .sort_by(field="score", asc=True)
                 .return_fields("id", "score", VECTOR_FIELD)
-                .dialect(2),
+                .dialect(DIALECT),
                 query_params={"blob": blob},
             )
             .docs
@@ -124,18 +124,27 @@ def get_args():
         help="use index type JSON instead of default HASH",
     )
 
+    parser.add_argument(
+        "-c",
+        dest="distance_metric",
+        action="store_const",
+        const="COSINE",
+        default="L2",
+        help="use DISTANCE_METRIC COSINE instead of default L2",
+    )
+
     args = parser.parse_args()
 
-    return args.index_type, args.in_file, args.max_hits
+    return args.index_type, args.in_file, args.max_hits, args.distance_metric
 
 
 ###
-INDEX_TYPE, IN_FILE, MAX_HITS = get_args()
+INDEX_TYPE, IN_FILE, MAX_HITS, DISTANCE_METRIC = get_args()
 VECTOR_FIELD = "vector"
 INDEX_NAME = f"idx:{INDEX_TYPE.name.lower()}:vectors"
 KEY_PREFIX = f"{VECTOR_FIELD}:"
 MAX_PIPELINE = 10000
-
+DIALECT = 2
 
 # collect input csv and calculate vector DIM
 my_vectors, dim = read_vectors()
@@ -155,7 +164,11 @@ my_redis.ft(INDEX_NAME).create_index(
         VectorField(
             name=VECTOR_FIELD if INDEX_TYPE == IndexType.HASH else f"$.{VECTOR_FIELD}",
             algorithm="FLAT",
-            attributes={"TYPE": "FLOAT64", "DIM": dim, "DISTANCE_METRIC": "L2"},
+            attributes={
+                "TYPE": "FLOAT64",
+                "DIM": dim,
+                "DISTANCE_METRIC": DISTANCE_METRIC,
+            },
             as_name=VECTOR_FIELD,
         )
     ),
