@@ -1,4 +1,4 @@
-uid,sprocket,chainring,sprocket,wheel
-haro,free,44,16,20
-fuji,fixed,44,19,27
-dolan,fixed,49,20,27
+uid,sprocket,vector
+haro,free,[44,16,20]
+fuji,fixed,[44,19,27]
+dolan,fixed,[49,20,27]

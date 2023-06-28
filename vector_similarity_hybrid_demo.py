@@ -8,6 +8,7 @@ RS_AUTH]. Install pre-reqs with: /usr/bin/pip3 install numpy
 import argparse
 import csv
 import os
+import re
 import redis
 import numpy as np
 
@@ -24,15 +25,17 @@ def read_rows():
         reader = csv.reader(in_file)
         headers = next(reader)
         for row in reader:
-            rows.append(
-                {
-                    headers[0]: row[0],
-                    headers[1]: row[1],
-                    VECTOR_FIELD: np.array(
-                        list([row[2], row[3], row[4]]), dtype=np.float64
-                    ),
-                }
-            )
+            row_dict = {}
+            vec = []
+            for i, val in enumerate(row):
+                # assume all columns after the VECTOR_FIELD column belong to the vector
+                if len(vec) > 0 or headers[i] == VECTOR_FIELD:
+                    print(val, float(re.sub(r"[\[\]]", "", val)))
+                    vec.append(float(re.sub(r"[\[\]]", "", val)))
+                else:
+                    row_dict[headers[i]] = val
+            row_dict[VECTOR_FIELD] = np.array(list(vec), dtype=np.float64)
+            rows.append(row_dict)
     return rows, len(rows[0]), headers
 
 
@@ -106,6 +109,31 @@ def search_rows():
             )
             .docs
         )
+
+
+def create_schema():
+    schema = (
+        VectorField(
+            name=VECTOR_FIELD if INDEX_TYPE == IndexType.HASH else f"$.{VECTOR_FIELD}",
+            algorithm="FLAT",
+            attributes={
+                "TYPE": "FLOAT64",
+                "DIM": DIM,
+                "DISTANCE_METRIC": DISTANCE_METRIC,
+            },
+            as_name=VECTOR_FIELD,
+        ),
+    )
+
+    for col in CSV_HEADERS:
+        if col != VECTOR_FIELD:
+            schema = schema + (
+                TagField(
+                    name=col if INDEX_TYPE == IndexType.HASH else f"$.{col}",
+                    as_name=col,
+                ),
+            )
+    return schema
 
 
 def get_args():
@@ -186,24 +214,9 @@ drop_index()
 ##        as_name=CSV_HEADERS[0],
 ##    ),
 
-SCHEMA = (
-    TagField(
-        name=CSV_HEADERS[1] if INDEX_TYPE == IndexType.HASH else f"$.{CSV_HEADERS[1]}",
-        as_name=CSV_HEADERS[1],
-    ),
-    VectorField(
-        name=VECTOR_FIELD if INDEX_TYPE == IndexType.HASH else f"$.{VECTOR_FIELD}",
-        algorithm="FLAT",
-        attributes={
-            "TYPE": "FLOAT64",
-            "DIM": DIM,
-            "DISTANCE_METRIC": DISTANCE_METRIC,
-        },
-        as_name=VECTOR_FIELD,
-    ),
-)
+
 MY_REDIS.ft(INDEX_NAME).create_index(
-    fields=SCHEMA,
+    fields=create_schema(),
     definition=IndexDefinition(index_type=INDEX_TYPE, prefix=[f"{KEY_PREFIX}:"]),
 )
 
