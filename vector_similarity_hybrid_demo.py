@@ -162,7 +162,7 @@ def get_args():
 ###
 INDEX_TYPE, IN_FILE, MAX_HITS, MAX_QUERIES, DISTANCE_METRIC = get_args()
 VECTOR_FIELD = "vector"
-KEY_PREFIX = "bikes"
+KEY_PREFIX = IN_FILE[:-4]
 INDEX_NAME = f"idx:hybrid:{KEY_PREFIX}"
 MAX_PIPELINE = 10000
 
