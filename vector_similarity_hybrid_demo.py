@@ -112,6 +112,7 @@ def search_rows():
 
 
 def create_schema():
+    """Create a RediSearch schema on HASH or JSON"""
     schema = (
         VectorField(
             name=VECTOR_FIELD if INDEX_TYPE == IndexType.HASH else f"$.{VECTOR_FIELD}",
